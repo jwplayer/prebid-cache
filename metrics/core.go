@@ -2,12 +2,14 @@ package metrics
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/prebid/prebid-cache/config"
 	"github.com/rcrowley/go-metrics"
-	"github.com/vrischmann/go-metrics-influxdb"
+	datadog "github.com/syntaqx/go-metrics-datadog"
+	influxdb "github.com/vrischmann/go-metrics-influxdb"
 )
 
 type MetricsEntry struct {
@@ -78,15 +80,27 @@ type Metrics struct {
 // This method blocks indefinitely, so it should probably be run in a goroutine.
 func (m *Metrics) Export(cfg config.Metrics) {
 	switch cfg.Type {
+	case config.MetricsDatadog:
+		logrus.Infof("Metrics will be exported to Datadog with host=%s, port=%s", cfg.Datadog.Host, cfg.Datadog.Port)
+		reporter, err := datadog.NewReporter(
+			m.Registry,
+			fmt.Sprintf("%s:%s", cfg.Datadog.Host, cfg.Datadog.Port),
+			time.Second*cfg.Interval,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		reporter.Client.Tags = cfg.Tags
+		reporter.Flush()
 	case config.MetricsInflux:
 		logrus.Infof("Metrics will be exported to Influx with host=%s, db=%s, username=%s", cfg.Influx.Host, cfg.Influx.Database, cfg.Influx.Username)
 		influxdb.InfluxDB(
-			m.Registry,          // metrics registry
-			time.Second*10,      // interval
-			cfg.Influx.Host,     // the InfluxDB url
-			cfg.Influx.Database, // your InfluxDB database
-			cfg.Influx.Username, // your InfluxDB user
-			cfg.Influx.Password, // your InfluxDB password
+			m.Registry,               // metrics registry
+			time.Second*cfg.Interval, // interval
+			cfg.Influx.Host,          // the InfluxDB url
+			cfg.Influx.Database,      // your InfluxDB database
+			cfg.Influx.Username,      // your InfluxDB user
+			cfg.Influx.Password,      // your InfluxDB password
 		)
 	case config.MetricsNone:
 		return
@@ -96,9 +110,9 @@ func (m *Metrics) Export(cfg config.Metrics) {
 	return
 }
 
-func CreateMetrics() *Metrics {
-	flushTime := time.Second * 10
-	r := metrics.NewPrefixedRegistry("prebidcache.")
+func CreateMetrics(cfg config.Metrics) *Metrics {
+	flushTime := time.Second * cfg.Interval
+	r := metrics.NewPrefixedRegistry(cfg.Prefix)
 	m := &Metrics{
 		Registry:        r,
 		Puts:            NewMetricsEntry("puts.current_url", r),

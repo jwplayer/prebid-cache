@@ -67,6 +67,10 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/syntaqx/go-metrics-datadog"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/vrischmann/go-metrics-influxdb"
 
 [[constraint]]

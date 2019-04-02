@@ -2,6 +2,7 @@ package config
 
 import (
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -136,27 +137,47 @@ const (
 )
 
 type Metrics struct {
-	Type   MetricsType `mapstructure:"type"`
-	Influx Influx      `mapstructure:"influx"`
+	Type     MetricsType   `mapstructure:"type"`
+	Interval time.Duration `mapstructure:"interval"`
+	Prefix   string        `mapstructure:"prefix"`
+	Tags     []string      `mapstructure:"tags"`
+	Datadog  Datadog       `mapstructure:"datadog"`
+	Influx   Influx        `mapstructure:"influx"`
 }
 
 func (cfg *Metrics) validateAndLog() {
 	log.Infof("config.metrics.type: %s", cfg.Type)
+	log.Infof("config.metrics.interval: %s", cfg.Interval)
+	log.Infof("config.metrics.prefix: %s", cfg.Prefix)
+	log.Infof("config.metrics.tags: %s", cfg.Tags)
 	switch cfg.Type {
 	case MetricsNone:
+	case MetricsDatadog:
+		cfg.Datadog.validateAndLog()
 	case MetricsInflux:
 		cfg.Influx.validateAndLog()
 	default:
-		log.Fatalf(`invalid config.metrics.type: %s. It must be "none" or "influx"`, cfg.Type)
+		log.Fatalf(`invalid config.metrics.type: %s.`, cfg.Type)
 	}
 }
 
 type MetricsType string
 
 const (
-	MetricsNone   MetricsType = "none"
-	MetricsInflux MetricsType = "influx"
+	MetricsNone    MetricsType = "none"
+	MetricsDatadog MetricsType = "datadog"
+	MetricsInflux  MetricsType = "influx"
 )
+
+type Datadog struct {
+	Host string `mapstructure:"host"`
+	Port string `mapstructure:"port"`
+}
+
+func (cfg *Datadog) validateAndLog() {
+	log.Infof("config.metrics.datadog.host: %s", cfg.Host)
+	log.Infof("config.metrics.datadog.port: %s", cfg.Port)
+}
 
 type Influx struct {
 	Host     string `mapstructure:"host"`

@@ -104,6 +104,12 @@
   revision = "ef8a98b0bbce4a65b5aa4c368430a80ddc533168"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/syntaqx/go-metrics-datadog"
+  packages = ["."]
+  revision = "312b31920cc58d05bd8f8b562c84928e8485b8d3"
+
+[[projects]]
   name = "github.com/influxdata/influxdb"
   packages = [
     "client",

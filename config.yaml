@@ -33,9 +33,15 @@ backend:
 compression:
   type: "snappy" # Can also be "none"
 metrics:
-  type: "none" # Can also be "influx"
+  type: "none" # Can also be "influx" or "datadog", see config options below
+  interval: 20 # the interval (in seconds) where metrics are updated/flushed
+  prefix: "prebidcache." # The prefix for all metrics
+  tags: ["a, b:1, c:def"]
   influx:
     host: "http://influx.prebid.com"
     database: "some-database"
     username: "influx-username"
     password: "influx-password"
+  datadog:
+    host: "my-datadog-host"
+    port: "8125"
