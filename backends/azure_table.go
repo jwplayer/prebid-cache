@@ -144,45 +144,53 @@ func (c *AzureTableBackend) Get(ctx context.Context, key string) (string, error)
 	return av.Value, nil
 }
 
-func (c *AzureTableBackend) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
+func (c *AzureTableBackend) MultiPut(ctx context.Context, payloads []Payload) error {
+	for _, payload := range payloads {
+		key := payload.Key
+		value := payload.Value
 
-	if key == "" {
-		return fmt.Errorf("Invalid Key")
+		if key == "" {
+			return fmt.Errorf("Invalid Key")
+		}
+
+		if value == "" {
+			return fmt.Errorf("Invalid Value")
+		}
+		partitionKey := c.makePartitionKey(key)
+		log.Debugf("POST partition key %s", partitionKey)
+		av := AzureValue{
+			ID:           key,
+			Value:        value,
+			PartitionKey: partitionKey,
+		}
+
+		b, err := json.Marshal(&av)
+		if err != nil {
+			return err
+		}
+
+		resourceLink := "/dbs/prebidcache/colls/cache/docs"
+
+		req := fasthttp.AcquireRequest()
+		defer fasthttp.ReleaseRequest(req)
+		var resp = fasthttp.AcquireResponse()
+		defer fasthttp.ReleaseResponse(resp)
+
+		req.Header.SetMethod("POST")
+		req.SetRequestURI(fmt.Sprintf("%s%s", c.URI, resourceLink))
+		req.SetBody(b)
+
+		req.Header.Add("x-ms-documentdb-partitionkey", c.wrapForHeader(partitionKey))
+		if err != nil {
+			return err
+		}
+		err = c.Send(ctx, req, resp, "docs", "dbs/prebidcache/colls/cache")
+		if err != nil {
+			return err
+		}
 	}
-
-	if value == "" {
-		return fmt.Errorf("Invalid Value")
-	}
-	partitionKey := c.makePartitionKey(key)
-	log.Debugf("POST partition key %s", partitionKey)
-	av := AzureValue{
-		ID:           key,
-		Value:        value,
-		PartitionKey: partitionKey,
-	}
-
-	b, err := json.Marshal(&av)
-	if err != nil {
-		return err
-	}
-
-	resourceLink := "/dbs/prebidcache/colls/cache/docs"
-
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
-	var resp = fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseResponse(resp)
-
-	req.Header.SetMethod("POST")
-	req.SetRequestURI(fmt.Sprintf("%s%s", c.URI, resourceLink))
-	req.SetBody(b)
-
-	req.Header.Add("x-ms-documentdb-partitionkey", c.wrapForHeader(partitionKey))
-	if err != nil {
-		return err
-	}
-	err = c.Send(ctx, req, resp, "docs", "dbs/prebidcache/colls/cache")
-	return err
+		
+	return nil
 }
 
 func (c *AzureTableBackend) makePartitionKey(objectKey string) string {

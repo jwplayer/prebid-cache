@@ -35,16 +35,22 @@ func (mc *Memcache) Get(ctx context.Context, key string) (string, error) {
 	return string(res.Value), nil
 }
 
-func (mc *Memcache) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
-	err := mc.client.Set(&memcache.Item{
-		Expiration: int32(ttlSeconds),
-		Key:        key,
-		Value:      []byte(value),
-	})
+func (mc *Memcache) MultiPut(ctx context.Context, payloads []Payload) error {
+	for _, payload := range payloads {
+		key := payload.Key
+		value := payload.Value
+		ttlSeconds := payload.TtlSeconds
 
-	if err != nil {
-		return err
+		err := mc.client.Set(&memcache.Item{
+			Expiration: int32(ttlSeconds),
+			Key:        key,
+			Value:      []byte(value),
+		})
+
+		if err != nil {
+			return err
+		}
 	}
-
+	
 	return nil
 }

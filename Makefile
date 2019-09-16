@@ -13,7 +13,7 @@ init:
 
 # Validates the code for style and unit tests
 test:
-	./validate.sh --nofmt
+	./validate.sh
 
 # Run the tests and make a linux binary for the app. For details about this strategy,
 # see https://blog.codeship.com/building-minimal-docker-containers-for-go-applications/

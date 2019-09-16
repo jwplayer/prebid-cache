@@ -8,7 +8,7 @@ RUN apt-get update \
 RUN apt-get install --assume-yes apt-utils
 RUN apt-get install -y ca-certificates
 
-ADD ./prebid-cache /app/prebid-cache
+ADD ./ /app/prebid-cache
 ADD ./config.yaml /app/
 
 WORKDIR /app

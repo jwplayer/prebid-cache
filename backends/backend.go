@@ -6,6 +6,13 @@ import (
 
 // Backend interface for storing data
 type Backend interface {
-	Put(ctx context.Context, key string, value string, ttlSeconds int) error
 	Get(ctx context.Context, key string) (string, error)
+	MultiPut(ctx context.Context, payloads []Payload) error
+}
+
+// Payload struct for storing the data to store in the backend
+type Payload struct {
+	Key string
+	Value string
+	TtlSeconds int
 }

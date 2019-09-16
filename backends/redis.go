@@ -47,11 +47,16 @@ func (redis *Redis) Get(ctx context.Context, key string) (string, error) {
 	return string(res), nil
 }
 
-func (redis *Redis) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
-	if ttlSeconds == 0 {
-		ttlSeconds = redis.cfg.Expiration * 60
+func (redis *Redis) MultiPut(ctx context.Context, payloads []Payload) error {
+	pipeline := redis.client.Pipeline()
+	for _, payload := range payloads {
+		ttlSeconds := payload.TtlSeconds
+		if ttlSeconds == 0 {
+			ttlSeconds = redis.cfg.Expiration * 60
+		}
+		pipeline.Set(payload.Key, payload.Value, time.Duration(ttlSeconds)*time.Second)
 	}
-	err := redis.client.Set(key, value, time.Duration(ttlSeconds)*time.Second).Err()
+	_, err := pipeline.Exec()
 
 	if err != nil {
 		return err

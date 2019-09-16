@@ -18,8 +18,13 @@ func (b *MemoryBackend) Get(ctx context.Context, key string) (string, error) {
 	return v, nil
 }
 
-func (b *MemoryBackend) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
-	b.db[key] = value
+func (b *MemoryBackend) MultiPut(ctx context.Context, payloads []Payload) error {
+	for _, payload := range payloads {
+		key := payload.Key
+		value := payload.Value
+		b.db[key] = value
+	}
+	
 	return nil
 }
 

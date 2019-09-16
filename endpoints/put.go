@@ -56,6 +56,7 @@ func NewPutHandler(backend backends.Backend, maxNumValues int, allowKeys bool) f
 		resps := putResponsePool.Get().(PutResponse)
 		resps.Responses = make([]PutResponseObject, len(put.Puts))
 		defer putResponsePool.Put(resps)
+		payloads := []backends.Payload{}
 
 		for i, p := range put.Puts {
 			if len(p.Value) == 0 {
@@ -87,42 +88,36 @@ func NewPutHandler(backend backends.Backend, maxNumValues int, allowKeys bool) f
 			}
 
 			logrus.Debugf("Storing value: %s", toCache)
-			resps.Responses[i].UUID = uuid.NewV4().String()
-			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-			defer cancel()
 			// Only allow setting a provided key if configured (and ensure a key is provided).
+			var key string
 			if allowKeys && len(p.Key) > 0 {
-				s, err := backend.Get(ctx, p.Key)
-				if err != nil || len(s) == 0 {
-					resps.Responses[i].UUID = p.Key
-				} else {
-					resps.Responses[i].UUID = ""
-				}
+				key = p.Key
+			} else {
+				key = uuid.NewV4().String()
 			}
-			// If we have a blank UUID, don't store anything.
-			// Eventually we may want to provide error details, but as of today this is the only non-fatal error
-			// Future error details could go into a second property of the Responses object, such as "errors"
-			if len(resps.Responses[i].UUID) > 0 {
-				err = backend.Put(ctx, resps.Responses[i].UUID, toCache, p.TTLSeconds)
-				if err != nil {
-					if _, ok := err.(*backendDecorators.BadPayloadSize); ok {
-						http.Error(w, fmt.Sprintf("POST /cache element %d exceeded max size: %v", i, err), http.StatusBadRequest)
-						return
-					}
+			resps.Responses[i].UUID = key
+			payloads = append(payloads, backends.Payload{Key: key, Value: toCache, TtlSeconds: p.TTLSeconds})
+		}
 
-					logrus.Error("POST /cache Error while writing to the backend: ", err)
-					switch err {
-					case context.DeadlineExceeded:
-						logrus.Error("POST /cache timed out:", err)
-						http.Error(w, "Timeout writing value to the backend", HttpDependencyTimeout)
-					default:
-						logrus.Error("POST /cache had an unexpected error:", err)
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-					}
-					return
-				}
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		err = backend.MultiPut(ctx, payloads)
+		if err != nil {
+			if _, ok := err.(*backendDecorators.BadPayloadSize); ok {
+				http.Error(w, fmt.Sprintf("POST /cache exceeded max size: %v", err), http.StatusBadRequest)
+				return
 			}
 
+			logrus.Error("POST /cache Error while writing to the backend: ", err)
+			switch err {
+			case context.DeadlineExceeded:
+				logrus.Error("POST /cache timed out:", err)
+				http.Error(w, "Timeout writing value to the backend", HttpDependencyTimeout)
+			default:
+				logrus.Error("POST /cache had an unexpected error:", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
 		}
 
 		bytes, err := json.Marshal(&resps)

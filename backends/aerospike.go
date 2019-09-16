@@ -50,22 +50,29 @@ func (a *Aerospike) Get(ctx context.Context, key string) (string, error) {
 	return rec.Bins[binValue].(string), nil
 }
 
-func (a *Aerospike) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
-	asKey, err := as.NewKey(a.cfg.Namespace, setName, key)
-	if err != nil {
-		return err
+func (a *Aerospike) MultiPut(ctx context.Context, payloads []Payload) error {
+	for _, payload := range payloads {
+		key := payload.Key
+		value := payload.Value
+		ttlSeconds := payload.TtlSeconds
+
+		asKey, err := as.NewKey(a.cfg.Namespace, setName, key)
+		if err != nil {
+			return err
+		}
+		if ttlSeconds == 0 {
+			ttlSeconds = a.cfg.DefaultTTL
+		}
+		bins := as.BinMap{
+			binValue: value,
+		}
+		err = a.client.Put(&as.WritePolicy{
+			Expiration: uint32(ttlSeconds),
+		}, asKey, bins)
+		if err != nil {
+			return err
+		}
 	}
-	if ttlSeconds == 0 {
-		ttlSeconds = a.cfg.DefaultTTL
-	}
-	bins := as.BinMap{
-		binValue: value,
-	}
-	err = a.client.Put(&as.WritePolicy{
-		Expiration: uint32(ttlSeconds),
-	}, asKey, bins)
-	if err != nil {
-		return err
-	}
+	
 	return nil
 }

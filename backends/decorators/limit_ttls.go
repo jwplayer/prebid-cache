@@ -19,9 +19,14 @@ type ttlLimited struct {
 	maxTTLSeconds int
 }
 
-func (l ttlLimited) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
-	if l.maxTTLSeconds > ttlSeconds {
-		return l.Backend.Put(ctx, key, value, ttlSeconds)
+func (l ttlLimited) MultiPut(ctx context.Context, payloads []backends.Payload) error {
+	limitedPayloads := []backends.Payload{}
+	for _, payload := range payloads {
+		if l.maxTTLSeconds < payload.TtlSeconds {
+			limitedPayloads = append(limitedPayloads, backends.Payload{Key: payload.Key, Value: payload.Value, TtlSeconds: l.maxTTLSeconds})
+		} else {
+			limitedPayloads = append(limitedPayloads, payload)
+		}
 	}
-	return l.Backend.Put(ctx, key, value, l.maxTTLSeconds)
+	return l.Backend.MultiPut(ctx, limitedPayloads)
 }

@@ -42,13 +42,23 @@ func (c *Cassandra) Get(ctx context.Context, key string) (string, error) {
 	return res, err
 }
 
-func (c *Cassandra) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
-	if ttlSeconds == 0 {
-		ttlSeconds = 2400
-	}
-	err := c.session.Query(`INSERT INTO cache (key, value) VALUES (?, ?) USING TTL ?`, key, value, ttlSeconds).
-		WithContext(ctx).
-		Exec()
+func (c *Cassandra) MultiPut(ctx context.Context, payloads []Payload) error {
+	for _, payload := range payloads {
+		key := payload.Key
+		value := payload.Value
+		ttlSeconds := payload.TtlSeconds
 
-	return err
+		if ttlSeconds == 0 {
+			ttlSeconds = 2400
+		}
+		err := c.session.Query(`INSERT INTO cache (key, value) VALUES (?, ?) USING TTL ?`, key, value, ttlSeconds).
+			WithContext(ctx).
+			Exec()
+
+		if err != nil {
+			return err
+		}
+	}
+		
+	return nil
 }

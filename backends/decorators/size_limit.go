@@ -25,8 +25,11 @@ func (b *sizeCappedBackend) Get(ctx context.Context, key string) (string, error)
 	return b.delegate.Get(ctx, key)
 }
 
-func (b *sizeCappedBackend) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
-	valueLen := len(value)
+func (b *sizeCappedBackend) MultiPut(ctx context.Context, payloads []backends.Payload) error {
+	valueLen := 0
+	for _, payload := range payloads {
+		valueLen += len(payload.Value)
+	}
 	if valueLen == 0 || valueLen > b.limit {
 		return &BadPayloadSize{
 			limit: b.limit,
@@ -34,7 +37,7 @@ func (b *sizeCappedBackend) Put(ctx context.Context, key string, value string, t
 		}
 	}
 
-	return b.delegate.Put(ctx, key, value, ttlSeconds)
+	return b.delegate.MultiPut(ctx, payloads)
 }
 
 type BadPayloadSize struct {

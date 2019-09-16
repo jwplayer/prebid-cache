@@ -19,8 +19,15 @@ type snappyCompressor struct {
 	delegate backends.Backend
 }
 
-func (s *snappyCompressor) Put(ctx context.Context, key string, value string, ttlSeconds int) error {
-	return s.delegate.Put(ctx, key, string(snappy.Encode(nil, []byte(value))), ttlSeconds)
+func (s *snappyCompressor) MultiPut(ctx context.Context, payloads []backends.Payload) error {
+	compressedPayloads := []backends.Payload{}
+	for _, payload := range payloads {
+		compressedPayloads = append(compressedPayloads, backends.Payload{
+			Key: payload.Key,
+			Value: string(snappy.Encode(nil, []byte(payload.Value))),
+			TtlSeconds: payload.TtlSeconds})
+	}
+	return s.delegate.MultiPut(ctx, compressedPayloads)
 }
 
 func (s *snappyCompressor) Get(ctx context.Context, key string) (string, error) {
