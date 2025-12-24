@@ -243,13 +243,24 @@ Prebid Cache makes use of a Cassandra client that supports latest 3 major releas
 
 ### Redis:
 Prebid Cache makes use of a Redis Go client compatible with Redis 6. Full documentation of the Redis Go client Prebid Cache uses can be found [here](https://github.com/go-redis/redis).
+
+Prebid Cache supports both single instance and cluster mode Redis configurations. Use `host` and `port` for single instance mode, or `addrs` for cluster mode.
+
 | Configuration field | Type | Description |
 | --- | --- | --- |
-| host | string | Redis server URI |
-| port | integer | Redis server port |
+| host | string | Redis server URI (single instance mode) |
+| port | integer | Redis server port (single instance mode) |
+| addrs | string array | List of Redis cluster node addresses in format "host:port" (cluster mode). If provided, cluster mode is enabled and host/port are ignored |
 | password | string | Redis password |
-| db | integer | Database to be selected after connecting to the server |
+| db | integer | Database to be selected after connecting to the server (single instance mode only, not used in cluster mode) |
 | expiration | integer | Availability in the Redis system in Minutes |
+| pool_size | integer | Maximum number of socket connections per node (optional, default: 10 * number of CPUs) |
+| min_idle_conns | integer | Minimum number of idle connections per node (optional) |
+| max_retries | integer | Maximum number of retries before giving up (optional, default: 3) |
+| dial_timeout | integer | Dial timeout in seconds (optional) |
+| read_timeout | integer | Read timeout in seconds (optional) |
+| write_timeout | integer | Write timeout in seconds (optional) |
+| pool_timeout | integer | Connection pool timeout in seconds (optional) |
 | tls | field | Subfields: <br> `enabled`: whether or not pass the InsecureSkipVerify value to the Redis client's TLS config <br> `insecure_skip_verify`: In Redis, InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name. If InsecureSkipVerify is true, crypto/t |
 
 Sample configuration file `config/configtest/sample_full_config.yaml` shown below:

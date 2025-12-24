@@ -157,6 +157,15 @@ type Redis struct {
 	Db                int      `mapstructure:"db"`
 	ExpirationMinutes int      `mapstructure:"expiration"`
 	TLS               RedisTLS `mapstructure:"tls"`
+	// Cluster mode configuration
+	Addrs             []string `mapstructure:"addrs"`
+	PoolSize          int      `mapstructure:"pool_size"`
+	MinIdleConns      int      `mapstructure:"min_idle_conns"`
+	MaxRetries        int      `mapstructure:"max_retries"`
+	DialTimeout       int      `mapstructure:"dial_timeout"`
+	ReadTimeout       int      `mapstructure:"read_timeout"`
+	WriteTimeout      int      `mapstructure:"write_timeout"`
+	PoolTimeout       int      `mapstructure:"pool_timeout"`
 }
 
 type RedisTLS struct {
@@ -165,9 +174,33 @@ type RedisTLS struct {
 }
 
 func (cfg *Redis) validateAndLog() error {
-	log.Infof("config.backend.redis.host: %s", cfg.Host)
-	log.Infof("config.backend.redis.port: %d", cfg.Port)
-	log.Infof("config.backend.redis.db: %d", cfg.Db)
+	if len(cfg.Addrs) > 0 {
+		if len(cfg.Addrs) < 2 {
+			log.Warnf("Redis cluster mode: It is recommended to provide at least 2-3 node addresses in addrs for redundancy")
+		}
+		if cfg.Db != 0 {
+			log.Warnf("Redis cluster mode: Database selection (db=%d) is ignored. Redis Cluster only supports database 0", cfg.Db)
+		}
+		log.Infof("config.backend.redis.addrs: %v (cluster mode)", cfg.Addrs)
+		log.Infof("config.backend.redis.pool_size: %d", cfg.PoolSize)
+		log.Infof("config.backend.redis.min_idle_conns: %d", cfg.MinIdleConns)
+		log.Infof("config.backend.redis.max_retries: %d", cfg.MaxRetries)
+		log.Infof("config.backend.redis.dial_timeout: %d", cfg.DialTimeout)
+		log.Infof("config.backend.redis.read_timeout: %d", cfg.ReadTimeout)
+		log.Infof("config.backend.redis.write_timeout: %d", cfg.WriteTimeout)
+		log.Infof("config.backend.redis.pool_timeout: %d", cfg.PoolTimeout)
+	} else {
+		if cfg.Host == "" {
+			return fmt.Errorf("config.backend.redis.host is required when not using cluster mode (addrs)")
+		}
+		if cfg.Port <= 0 {
+			return fmt.Errorf("config.backend.redis.port must be greater than 0 when not using cluster mode (addrs)")
+		}
+		log.Infof("config.backend.redis.host: %s", cfg.Host)
+		log.Infof("config.backend.redis.port: %d", cfg.Port)
+		log.Infof("config.backend.redis.db: %d", cfg.Db)
+	}
+
 	if cfg.ExpirationMinutes > 0 {
 		log.Infof("config.backend.redis.expiration: %d. Note that this configuration option is being deprecated in favor of config.request_limits.max_ttl_seconds", cfg.ExpirationMinutes)
 	}

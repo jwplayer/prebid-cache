@@ -38,6 +38,21 @@ func (db RedisDBClient) Put(ctx context.Context, key, value string, ttlSeconds i
 	return db.client.SetNX(ctx, key, value, time.Duration(ttlSeconds)*time.Second).Result()
 }
 
+type RedisClusterDBClient struct {
+	client *redis.ClusterClient
+}
+
+func (db RedisClusterDBClient) Get(ctx context.Context, key string) (string, error) {
+	return db.client.Get(ctx, key).Result()
+}
+
+// Put will set 'key' to hold string 'value' if 'key' does not exist in the redis storage.
+// When key already holds a value, no operation is performed. That's the reason this adapter
+// uses the 'github.com/go-redis/redis's library SetNX. SetNX is short for "SET if Not eXists".
+func (db RedisClusterDBClient) Put(ctx context.Context, key, value string, ttlSeconds int) (bool, error) {
+	return db.client.SetNX(ctx, key, value, time.Duration(ttlSeconds)*time.Second).Result()
+}
+
 // RedisBackend when initialized will instantiate and configure the Redis client. It implements
 // the Backend interface.
 type RedisBackend struct {
@@ -45,8 +60,24 @@ type RedisBackend struct {
 	client RedisDB
 }
 
-// NewRedisBackend initializes the redis client and pings to make sure connection was successful
+// NewRedisBackend initializes the redis client (single instance or cluster) and pings to make sure connection was successful
 func NewRedisBackend(cfg config.Redis, ctx context.Context) *RedisBackend {
+	var client RedisDB
+
+	if len(cfg.Addrs) > 0 {
+		client = newRedisClusterClient(cfg, ctx)
+	} else {
+		client = newRedisClient(cfg, ctx)
+	}
+
+	return &RedisBackend{
+		cfg:    cfg,
+		client: client,
+	}
+}
+
+// newRedisClient creates a single instance Redis client
+func newRedisClient(cfg config.Redis, ctx context.Context) RedisDB {
 	constr := cfg.Host + ":" + strconv.Itoa(cfg.Port)
 
 	options := &redis.Options{
@@ -55,21 +86,37 @@ func NewRedisBackend(cfg config.Redis, ctx context.Context) *RedisBackend {
 		DB:       cfg.Db,
 	}
 
+	if cfg.PoolSize > 0 {
+		options.PoolSize = cfg.PoolSize
+	}
+	if cfg.MinIdleConns > 0 {
+		options.MinIdleConns = cfg.MinIdleConns
+	}
+	if cfg.MaxRetries > 0 {
+		options.MaxRetries = cfg.MaxRetries
+	}
+	if cfg.DialTimeout > 0 {
+		options.DialTimeout = time.Duration(cfg.DialTimeout) * time.Second
+	}
+	if cfg.ReadTimeout > 0 {
+		options.ReadTimeout = time.Duration(cfg.ReadTimeout) * time.Second
+	}
+	if cfg.WriteTimeout > 0 {
+		options.WriteTimeout = time.Duration(cfg.WriteTimeout) * time.Second
+	}
+	if cfg.PoolTimeout > 0 {
+		options.PoolTimeout = time.Duration(cfg.PoolTimeout) * time.Second
+	}
+
 	if cfg.TLS.Enabled {
-		options = &redis.Options{
-			Addr:     constr,
-			Password: cfg.Password,
-			DB:       cfg.Db,
-			TLSConfig: &tls.Config{
-				InsecureSkipVerify: cfg.TLS.InsecureSkipVerify,
-			},
+		options.TLSConfig = &tls.Config{
+			InsecureSkipVerify: cfg.TLS.InsecureSkipVerify,
 		}
 	}
 
 	redisClient := RedisDBClient{client: redis.NewClient(options)}
 
 	_, err := redisClient.client.Ping(ctx).Result()
-
 	if err != nil {
 		log.Fatalf("Error creating Redis backend: %v", err)
 		panic("RedisBackend failure. This shouldn't happen.")
@@ -77,10 +124,55 @@ func NewRedisBackend(cfg config.Redis, ctx context.Context) *RedisBackend {
 
 	log.Infof("Connected to Redis at %s:%d", cfg.Host, cfg.Port)
 
-	return &RedisBackend{
-		cfg:    cfg,
-		client: redisClient,
+	return redisClient
+}
+
+// newRedisClusterClient creates a Redis cluster client
+func newRedisClusterClient(cfg config.Redis, ctx context.Context) RedisDB {
+	options := &redis.ClusterOptions{
+		Addrs:    cfg.Addrs,
+		Password: cfg.Password,
 	}
+
+	if cfg.PoolSize > 0 {
+		options.PoolSize = cfg.PoolSize
+	}
+	if cfg.MinIdleConns > 0 {
+		options.MinIdleConns = cfg.MinIdleConns
+	}
+	if cfg.MaxRetries > 0 {
+		options.MaxRetries = cfg.MaxRetries
+	}
+	if cfg.DialTimeout > 0 {
+		options.DialTimeout = time.Duration(cfg.DialTimeout) * time.Second
+	}
+	if cfg.ReadTimeout > 0 {
+		options.ReadTimeout = time.Duration(cfg.ReadTimeout) * time.Second
+	}
+	if cfg.WriteTimeout > 0 {
+		options.WriteTimeout = time.Duration(cfg.WriteTimeout) * time.Second
+	}
+	if cfg.PoolTimeout > 0 {
+		options.PoolTimeout = time.Duration(cfg.PoolTimeout) * time.Second
+	}
+
+	if cfg.TLS.Enabled {
+		options.TLSConfig = &tls.Config{
+			InsecureSkipVerify: cfg.TLS.InsecureSkipVerify,
+		}
+	}
+
+	clusterClient := RedisClusterDBClient{client: redis.NewClusterClient(options)}
+
+	_, err := clusterClient.client.Ping(ctx).Result()
+	if err != nil {
+		log.Fatalf("Error creating Redis cluster backend: %v", err)
+		panic("RedisClusterBackend failure. This shouldn't happen.")
+	}
+
+	log.Infof("Connected to Redis cluster at %v", cfg.Addrs)
+
+	return clusterClient
 }
 
 // Get calls the Redis client to return the value associated with the provided `key`

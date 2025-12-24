@@ -26,11 +26,22 @@ backend:
 #   poll_interval_seconds: 30 # Node change polling interval when auto discovery is used
 #   hosts: "10.0.0.1:11211" # List of nodes when not using auto discovery. Can also use an array for multiple hosts. 
 # redis:
+#   # Single instance mode (use host and port)
 #   host: "127.0.0.1"
 #   port: 6379
 #   password: ""
 #   db: 1
 #   expiration: 10   # in Minutes
+#   # Cluster mode (use addrs instead of host/port)
+#   # addrs: ["127.0.0.1:7000", "127.0.0.1:7001", "127.0.0.1:7002"]
+#   # Connection pool settings (optional, applies to both single instance and cluster)
+#   # pool_size: 10
+#   # min_idle_conns: 5
+#   # max_retries: 3
+#   # dial_timeout: 5  # seconds
+#   # read_timeout: 3  # seconds
+#   # write_timeout: 3 # seconds
+#   # pool_timeout: 4  # seconds
 #   tls:
 #     enabled: false
 #     insecure_skip_verify: false
